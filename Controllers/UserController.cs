@@ -3,7 +3,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text.RegularExpressions;
 using inicio.models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,7 +32,7 @@ public class UserController : ControllerBase
         configuration = configuration2;
     }
 
-    [HttpPost]
+    [HttpPost("Register")]
     public async Task<ActionResult<Usuarios>> PostUsuariosItem([FromBody] UserModel userModel)
     {
         var find = await gallery.Usuarios.FirstOrDefaultAsync(User => User.Email == userModel.Email);
@@ -138,11 +137,11 @@ public class UserController : ControllerBase
         return Ok("You are a : " + rolUser2.rol);
 
     }
-    [Authorize]
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Usuarios>> GetUsuariosItem(int id)
+    
+    [HttpGet("{token}")]
+    public async Task<ActionResult> GetUsuariosItem(string token)
     {
-        Usuarios? findUser = await gallery.Usuarios.FindAsync(id);
+        var findUser = await gallery.Usuarios.FirstOrDefaultAsync(option => option.token == token);
             if (findUser == null)
             {
                 return NotFound("User not exist");
@@ -157,7 +156,7 @@ public class UserController : ControllerBase
             return StatusCode(403, "The user does not have permission for this action");
         }
             
-            return findUser;
+            return Ok(findUser);
         
         
 
@@ -279,7 +278,7 @@ public class UserController : ControllerBase
         return Ok("User successfully deleted");
     }
     [HttpPost("login")]
-    public async Task<IActionResult> UserLogin([FromForm] UserModel userModel)
+    public async Task<IActionResult> UserLogin([FromBody] UserModel userModel)
     {
         var confirm =await gallery.Usuarios.FirstOrDefaultAsync(option =>option.Email == userModel.Email);
         if(confirm== null){
@@ -304,22 +303,22 @@ public class UserController : ControllerBase
         return BadRequest("User not authorize");
     }
     [HttpPost("Autenticate")]
-    public async Task<IActionResult> UserAutenticate([FromBody] UserAutenticate userAutenticate)
+    public async Task<IActionResult> UserAutenticate([FromBody] UserToken userToken)
     {
-        Usuarios? find = gallery.Usuarios.FirstOrDefault(options => options.Email == userAutenticate.Email);
-        if (find == null)
-        {
-            return NotFound("User not registered");
-        }
-
-        if (generatedJwt.VerifyToken(userAutenticate.Token))
+        
+        if (generatedJwt.VerifyToken(userToken.token))
         {
             return Unauthorized("Please login again");
+        }
+        var find = gallery.Usuarios.FirstOrDefault(option =>option.token == userToken.token);
+        if(find == null){
+            
+            return NotFound("User not registered");
         }
         find.token = generatedJwt.GeneratedToken(find.Email, find.Password);
         gallery.Entry(find).State = EntityState.Modified;
         await gallery.SaveChangesAsync();
-        return Ok("User is Autenticate");
+        return Ok(find.token);
     }
 
 
